@@ -1,6 +1,6 @@
 [submodule "sonLib"]
 	path = sonLib
-	url = https://github.com/ArtRand/sonLib.git
+	url = https://github.com/mitenjain/sonLib.git
 [submodule "serviceCourse"]
 	path = serviceCourse
-	url = https://github.com/ArtRand/serviceCourse.git
+	url = https://github.com/mitenjain/serviceCourse.git
