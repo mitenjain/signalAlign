@@ -11,11 +11,15 @@ signalAlignLib = ${basicLibs}
 all : sL bD ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests ${signalAlignBin}/compareDistributions \
       ${signalAlignBin}/signalMachine ${signalAlignBin}/runSignalAlign \
 	  ${signalAlignBin}/signalAlignLib.py ${signalAlignBin}/variantCallingLib.py ${signalAlignBin}/alignmentAnalysisLib.py \
-      ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels ${signalAlignBin}/hdp_pipeline ${signalAlignBin}/testSignalAlign
+      ${signalAlignBin}/buildHdpUtil ${signalAlignBin}/trainModels ${signalAlignBin}/hdp_pipeline ${signalAlignBin}/testSignalAlign \
+	  externals
       #nanoporeParams
       #${signalAlignBin}/zayante ${signalAlignBin}/bonnyDoon \
       #${signalAlignBin}/empire ${signalAlignBin}/jamison \
-	cd externalTools && make all
+
+core : sL bD ${libPath}/signalAlignLib.a ${signalAlignBin}/signalAlignLibTests ${signalAlignBin}/signalMachine
+
+install: all pip_install
 
 clean_light:
 	if [ -d ${signalAlignBin} ]; then rm -r ${signalAlignBin}; fi
@@ -27,6 +31,9 @@ clean :
 	rm -f ${libPath}/signalAlignLib.a
 	cd externalTools && make clean
 
+pip_install:
+	pip install -e .
+
 signalAlignLib : ${libPath}/signalAlignLib.a
 
 sL :
@@ -34,6 +41,9 @@ sL :
 
 bD :
 	mkdir -v -p ${rootPath}bin
+
+externals :
+	cd externalTools && make all
 
 test :
 	#cd ${signalAlignBin} && ./signalAlignLibTests

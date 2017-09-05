@@ -1,13 +1,35 @@
 #!/usr/bin/env python
-"""Run signal-to-reference alignments
+"""Main driver script for running an ionic current-to-sequence alignment on a single machine.
 """
 from __future__ import print_function
+
 import sys
-from signalAlignLib import *
-from multiprocessing import Process, Queue, current_process, Manager
-from serviceCourse.file_handlers import FolderHandler
+import os
+
+#import pysam
+
 from argparse import ArgumentParser
 from random import shuffle
+from multiprocessing import Process, current_process, Manager
+
+from signalalign.signalAlignment import SignalAlignment
+from signalalign.utils import processReferenceFasta, parseFofn
+from signalalign.utils.fileHandlers import FolderHandler
+from signalalign.utils.bwaWrapper import getBwaIndex
+from signalalign.motif import getDegenerateEnum
+
+
+def signalAlignSourceDir():
+    return "/".join(os.path.abspath(__file__).split("/")[:-1])  # returns path without runSignalAlign
+
+
+def resolvePath(p):
+    if p is None:
+        return None
+    elif p.startswith("/"):
+        return p
+    else:
+        return os.path.abspath(p)
 
 
 def parse_args():
@@ -23,8 +45,8 @@ def parse_args():
                         required=True, type=str, default=None,
                         help="directory to put the alignments")
     # optional arguments
-    parser.add_argument("--2d", action='store_true', dest="twoD", default=False)
-    parser.add_argument("--bwt", action='store', dest="bwt", default=None)
+    parser.add_argument("--2d", action='store_true', dest="twoD", default=False, help="flag, specify if using 2D reads")
+    parser.add_argument("--bwt", action='store', dest="bwt", default=None, help="path to BWT files. example: ../ref.fasta")
     parser.add_argument('--in_template_hmm', '-T', action='store', dest='in_T_Hmm',
                         required=False, type=str, default=None,
                         help="input HMM for template events, if you don't want the default")
@@ -43,62 +65,29 @@ def parse_args():
     parser.add_argument('--file_of_files', '-fofn', action='store', dest='fofn', required=False, type=str, default=None,
                         help="text file containing absolute paths to files to use")
     parser.add_argument('--threshold', '-t', action='store', dest='threshold', type=float, required=False,
-                        default=None, help="posterior match probability threshold, Default: 0.01")
+                        default=0.01, help="posterior match probability threshold, Default: 0.01")
     parser.add_argument('--diagonalExpansion', '-e', action='store', dest='diag_expansion', type=int,
-                        required=False, default=None, help="number of diagonals to expand around each anchor")
+                        required=False, default=None,
+                        help="number of diagonals to expand around each anchor default: 50")
     parser.add_argument('--constraintTrim', '-m', action='store', dest='constraint_trim', type=int,
                         required=False, default=None, help='amount to remove from an anchor constraint')
     parser.add_argument('--target_regions', '-q', action='store', dest='target_regions', type=str,
                         required=False, default=None, help="tab separated table with regions to align to")
     parser.add_argument("--motif", action="store", dest="motif_key", default=None)
-    #parser.add_argument('--ambiguity_positions', '-p', action='store', required=False, default=None,
-    #                    dest='substitution_file', help="Ambiguity positions")
+    parser.add_argument('--ambiguity_positions', '-p', action='store', required=False, default=None,
+                        dest='ambiguity_positions', help="Ambiguity positions")
     parser.add_argument('--jobs', '-j', action='store', dest='nb_jobs', required=False,
                         default=4, type=int, help="number of jobs to run in parallel")
     parser.add_argument('--nb_files', '-n', action='store', dest='nb_files', required=False,
                         default=500, type=int, help="maximum number of reads to align")
-    parser.add_argument('--ambig_char', '-X', action='store', required=False, default="X", type=str, dest='ambig_char',
-                        help="Character to substitute at positions, default is 'X'.")
+    parser.add_argument('--ambig_char', '-X', action='store', required=False, default=None, type=str, dest='ambig_char',
+                        help="")
     parser.add_argument('--output_format', '-f', action='store', default="full", dest='outFmt',
                         help="output format: full, variantCaller, or assignments. Default: full")
     parser.add_argument('--debug', action='store_true', dest="DEBUG", default=False)
 
     args = parser.parse_args()
     return args
-
-
-def make_degenerate_reference_iterator(input_sequence, block_size=1, step=6):
-    """
-    input_sequence: string, input nucleotide sequence
-    out_path: string, path to directory to put new sequences with substituted degenerate characters
-    block_size: not implemented
-    step: number of bases between degenerate characters
-    :return (subbed sequence, complement subbed sequence)
-    """
-    complement_sequence = reverse_complement(dna=input_sequence, reverse=False, complement=True)
-
-    for s in xrange(0, step):
-        positions = xrange(s, len(input_sequence), step)
-        t_seq = list(input_sequence)
-        c_seq = list(complement_sequence)
-        for position in positions:
-            t_seq[position] = "X"
-            c_seq[position] = "X"
-        yield ''.join(t_seq), ''.join(c_seq)
-
-
-def write_degenerate_reference_set(input_fasta, out_path):
-    # get the first sequence from the FASTA
-    seq = ""
-    for header, comment, sequence in read_fasta(input_fasta):
-        seq += sequence
-        break
-
-    for i, s in enumerate(make_degenerate_reference_iterator(input_sequence=seq)):
-        with open(out_path + "forward_sub{i}.txt".format(i=i), 'w') as f:
-            f.write("{seq}".format(seq=s[0]))
-        with open(out_path + "backward_sub{i}.txt".format(i=i), 'w') as f:
-            f.write("{seq}".format(seq=s[1]))
 
 
 def aligner(work_queue, done_queue):
@@ -123,6 +112,18 @@ def main(args):
     command_line = " ".join(sys.argv[:])
     print("Command Line: {cmdLine}\n".format(cmdLine=command_line), file=sys.stderr)
 
+    # get absolute paths to inputs
+    args.files_dir           = resolvePath(args.files_dir)
+    args.ref                 = resolvePath(args.ref)
+    args.out                 = resolvePath(args.out)
+    args.bwt                 = resolvePath(args.bwt)
+    args.in_T_Hmm            = resolvePath(args.in_T_Hmm)
+    args.in_C_Hmm            = resolvePath(args.in_C_Hmm)
+    args.templateHDP         = resolvePath(args.templateHDP)
+    args.complementHDP       = resolvePath(args.complementHDP)
+    args.fofn                = resolvePath(args.fofn)
+    args.target_regions      = resolvePath(args.target_regions)
+    args.ambiguity_positions = resolvePath(args.ambiguity_positions)
     start_message = """
 #   Starting Signal Align
 #   Aligning files from: {fileDir}
@@ -151,27 +152,22 @@ def main(args):
 
     # make directory to put temporary files
     temp_folder = FolderHandler()
-    temp_dir_path = temp_folder.open_folder(args.out + "tempFiles_alignment")
+    temp_dir_path = temp_folder.open_folder(args.out + "/tempFiles_alignment")
 
-    reference_map = process_reference_fasta(fasta=args.ref,
-                                            motif_key=args.motif_key,
-                                            work_folder=temp_folder,
-                                            sub_char=args.ambig_char)
+    reference_map = processReferenceFasta(fasta=args.ref,
+                                          motif_key=args.motif_key,
+                                          work_folder=temp_folder,
+                                          sub_char=args.ambig_char,
+                                          positions_file=args.ambiguity_positions)
 
     # index the reference for bwa
     if args.bwt is not None:
-        print("signalAlign - using provided BWT %s" % args.bwt)
+        print("[RunSignalAlign]NOTICE - using provided BWT %s" % args.bwt)
         bwa_ref_index = args.bwt
     else:
         print("signalAlign - indexing reference", file=sys.stderr)
-        bwa_ref_index = get_bwa_index(args.ref, temp_dir_path)
+        bwa_ref_index = getBwaIndex(args.ref, temp_dir_path)
         print("signalAlign - indexing reference, done", file=sys.stderr)
-
-    # parse the target regions, if provided
-    if args.target_regions is not None:
-        target_regions = TargetRegions(args.target_regions)
-    else:
-        target_regions = None
 
     # setup workers for multiprocessing
     workers = args.nb_jobs
@@ -181,19 +177,23 @@ def main(args):
 
     # list of read files
     if args.fofn is not None:
-        fast5s = [x for x in parse_fofn(args.fofn) if x.endswith(".fast5")]
+        fast5s = [x for x in parseFofn(args.fofn) if x.endswith(".fast5")]
     else:
-        fast5s = [args.files_dir + x for x in os.listdir(args.files_dir) if x.endswith(".fast5")]
+        fast5s = ["/".join([args.files_dir, x]) for x in os.listdir(args.files_dir) if x.endswith(".fast5")]
 
     nb_files = args.nb_files
     if nb_files < len(fast5s):
         shuffle(fast5s)
         fast5s = fast5s[:nb_files]
+
+    # change paths to the source directory
+    os.chdir(signalAlignSourceDir())
+
     print("[runSignalAlign]:NOTICE: Got {} files to align".format(len(fast5s)), file=sys.stdout)
     for fast5 in fast5s:
+        print(fast5)
         alignment_args = {
             "reference_map": reference_map,
-            "path_to_EC_refs": None,  # TODO refactor this out!
             "destination": temp_dir_path,
             "stateMachineType": args.stateMachineType,
             "bwa_index": bwa_ref_index,
@@ -206,13 +206,15 @@ def main(args):
             "threshold": args.threshold,
             "diagonal_expansion": args.diag_expansion,
             "constraint_trim": args.constraint_trim,
-            "target_regions": target_regions,
-            "degenerate": degenerate_enum(args.degenerate),
+            "degenerate": getDegenerateEnum(args.degenerate),
             "twoD_chemistry": args.twoD,
+            "target_regions": args.target_regions,
         }
-        #alignment = SignalAlignment(**alignment_args)
-        #alignment.run()
-        work_queue.put(alignment_args)
+        if args.DEBUG:
+            alignment = SignalAlignment(**alignment_args)
+            alignment.run()
+        else:
+            work_queue.put(alignment_args)
 
     for w in xrange(workers):
         p = Process(target=aligner, args=(work_queue, done_queue))
