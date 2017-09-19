@@ -6,10 +6,10 @@ import h5py
 from itertools import islice
 
 
-TEMPLATE_BASECALL_KEY_0 = "/Analyses/Basecall_1D_001"
+TEMPLATE_BASECALL_KEY_0 = ("/Analyses/Basecall_1D_000", "/Analyses/Basecall_1D_001")
 TWOD_BASECALL_KEY_0     = "/Analyses/Basecall_2D_000"
-VERSION_KEY             = "version"
-SUPPORTED_1D_VERSIONS   = ("1.2.1")
+VERSION_KEY             = ("version", "dragonet version")
+SUPPORTED_1D_VERSIONS   = ("1.2.1", "1.2.4", "1.23.0", "1.22.4")
 
 
 class NanoporeRead(object):
@@ -79,19 +79,22 @@ class NanoporeRead(object):
         """Routine setup 1D NanoporeReads, returns false if basecalled with upsupported
         version or is not base-called
         """
-        if TEMPLATE_BASECALL_KEY_0 not in self.fastFive:  # not base-called
+        if any(x in  self.fastFive for x in TEMPLATE_BASECALL_KEY_0) == False:
             self.logError("[NanoporeRead:_initialize]ERROR %s not basecalled" % self.filename, parent_job)
             self.close()
             return False
 
         oneD_root_address = self.get_latest_basecall_edition("/Analyses/Basecall_1D_00{}")
 
-        if VERSION_KEY not in self.fastFive[oneD_root_address].attrs.keys():
+        if any(x in  self.fastFive[oneD_root_address].attrs.keys() for x in VERSION_KEY) == False:
             self.logError("[NanoporeRead:_initialize]ERROR %s missing version" % self.filename, parent_job)
             self.close()
             return False
 
-        self.version = self.fastFive[oneD_root_address].attrs["version"]
+        if "version" in self.fastFive[oneD_root_address].attrs.keys():
+            self.version = self.fastFive[oneD_root_address].attrs["version"]
+        else:
+            self.version = self.fastFive[oneD_root_address].attrs["dragonet version"]
 
         if self.version not in SUPPORTED_1D_VERSIONS:
             self.logError("[NanoporeRead:_initialize]ERROR %s unsupported version %s " % (self.filename, self.version),
