@@ -9,7 +9,7 @@ from itertools import islice
 TEMPLATE_BASECALL_KEY_0 = ("/Analyses/Basecall_1D_000", "/Analyses/Basecall_1D_001")
 TWOD_BASECALL_KEY_0     = "/Analyses/Basecall_2D_000"
 VERSION_KEY             = ("version", "dragonet version")
-SUPPORTED_1D_VERSIONS   = ("1.2.1", "1.2.4", "1.23.0", "1.22.4")
+SUPPORTED_1D_VERSIONS   = ("1.2.1", "1.2.4", "1.23.0", "1.22.4", "2.1.0")
 
 
 class NanoporeRead(object):
