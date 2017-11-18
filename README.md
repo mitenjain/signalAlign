@@ -6,7 +6,7 @@ _Currently Refactoring for RNA_. Documentation is probably out of date.
 ### Cheat sheet/Quick Start
 
 ### Pre-installation on `toil-box` (if you're using `cgcloud`)
-1. sudo apt-get update && sudo apt-get install zlib1g-dev g++ git
+1. 	sudo apt-get update && sudo apt-get install zlib1g-dev g++ git
 
 ### Getting BWA
 1. `git clone https://github.com/lh3/bwa.git`
