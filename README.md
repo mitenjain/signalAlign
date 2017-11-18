@@ -1,12 +1,12 @@
 ## SignalAlign
 
 #### MinION signal-level alignment and methylation detection using hidden Markov Models with hierarchical Dirichlet process kmer learning.
-_Currently Refactoring for Toil_. Documentation is probably out of date.
+_Currently Refactoring for RNA_. Documentation is probably out of date.
 
 ### Cheat sheet/Quick Start
 
 ### Pre-installation on `toil-box` (if you're using `cgcloud`)
-1. `sudo apt-get update && sudo apt-get install zlib1g-dev g++ git`
+1.
 
 ### Getting BWA
 1. `git clone https://github.com/lh3/bwa.git`
@@ -15,7 +15,7 @@ _Currently Refactoring for Toil_. Documentation is probably out of date.
 4. `export $PATH=$(pwd):$PATH`
 
 ### Installation:
-1. Recursively clone this repo `git clone --recursive -b toil_refactor https://github.com/ArtRand/signalAlign.git`
+1. Recursively clone this repo `git clone --recursive -b rna https://github.com/mitenjain/signalAlign.git`
 2. `cd signalAlign && make`
 3. `pip install -e .`
 4. Test the installation by running `cd bin && ./testSignalAlign`
@@ -33,6 +33,9 @@ Nanopore sequencing is based on the principal of isolating a nanopore in a membr
     * Needs to be in path
 * GCC 4.4.7 or newer (tested on 4.4.7 and 5.0)
 
+### Creating a virtual environment to handle python dependencies
+signalAlign uses H5Py, Numpy, and Pandas (see requirements.txt for versions used). The system python could be used if these dependencies are present. Otherwise, a virtual environment can be created by running the following command in the signalAlign base directory:
+	virtualenv --no-site-packages --distribute env && source env/bin/activate && pip install -r requirements.txt
 
 ### Using Docker
 These steps were tested in both a Linux and OS X Sierra environment using Docker: 
