@@ -35,6 +35,7 @@ Nanopore sequencing is based on the principal of isolating a nanopore in a membr
 
 ### Creating a virtual environment to handle python dependencies
 signalAlign uses H5Py, Numpy, and Pandas (see requirements.txt for versions used). The system python could be used if these dependencies are present. Otherwise, a virtual environment can be created by running the following command in the signalAlign base directory:
+
 	virtualenv --no-site-packages --distribute env && source env/bin/activate && pip install -r requirements.txt
 
 ### Using Docker
