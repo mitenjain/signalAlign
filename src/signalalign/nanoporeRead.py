@@ -9,7 +9,7 @@ from itertools import islice
 TEMPLATE_BASECALL_KEY_0 = ("/Analyses/Basecall_1D_000", "/Analyses/Basecall_1D_001")
 TWOD_BASECALL_KEY_0     = "/Analyses/Basecall_2D_000"
 VERSION_KEY             = ("version", "dragonet version")
-SUPPORTED_1D_VERSIONS   = ("1.2.1", "1.2.4", "1.23.0", "1.22.4", "2.1.0")
+SUPPORTED_1D_VERSIONS   = ("1.0.1", "1.2.1", "1.2.4", "1.23.0", "1.22.4", "2.1.0")
 
 
 class NanoporeRead(object):
@@ -112,7 +112,8 @@ class NanoporeRead(object):
             self.close()
             return False
 
-        self.template_read        = self.fastFive[fastq_sequence_address][()].split()[2]
+        # replace U's with T's and invert string
+        self.template_read        = self.fastFive[fastq_sequence_address][()].split()[2].replace("U", "T")[::-1]
         self.read_label           = self.fastFive[fastq_sequence_address][()].split()[0][1:]
         self.kmer_length          = len(self.fastFive[self.template_event_table_address][0][4])
         self.template_read_length = len(self.template_read)
