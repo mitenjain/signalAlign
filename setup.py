@@ -16,5 +16,5 @@ setup(name="signalAlign",
                         "pysam==0.8.2.1",
                         "pandas==0.18.1",
                         "sonLib==1.1.0",
-                        "PyYAML==5.1"]
+                        "PyYAML==5.4"]
       )
